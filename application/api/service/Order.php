@@ -18,6 +18,7 @@ use app\lib\exception\UserException;
 use app\api\model\Order as OrderModel;
 use think\Db;
 use think\Exception;
+use think\Log;
 
 class Order
 {
@@ -80,7 +81,7 @@ class Order
                 $status['pass'] = false;
             }
             $status['orderPrice'] += $pStatus['totalPrice'];
-            $status['totalCount'] += $pStatus['count'];
+            $status['totalCount'] += $pStatus['counts'];
             array_push($status['pStatusArray'], $pStatus);
         }
         return $status;
@@ -122,7 +123,7 @@ class Order
             // 改写订单商品状态
             $product = $products[$pIndex];
             $pStatus['id'] = $product['id'];
-            $pStatus['count'] = $oCount;
+            $pStatus['counts'] = $oCount;
             $pStatus['name'] = $product['name'];
             $pStatus['totalPrice'] = $product['price'] * $oCount;
             $pStatus['price'] = $product['price'];
@@ -284,7 +285,7 @@ class Order
     }
 
     /**
-     * 一般订单（非微信订单）则只需修改订单状态为收货即可
+     * 一般订单（非微信订单）则只需修改订单状态为收货，并发送短信通知即可
      * @param $orderID 订单id
      * @return bool
      * @throws Exception
@@ -309,6 +310,28 @@ class Order
         // 修改订单状态为收货
         $order->status = OrderStatusEnum::DELIVERED;
         $order->save();
+
+        // 发送短信所需参数
+        $phoneNumbers = $order->snap_address['mobile'];  // 短信接收号码
+        $templateCode = 'SMS_136857489';  // 短信模板Code
+        // 短信模板参数
+        $templateParams = [
+            'name' => $order->snap_address['name'],
+            'orderNo' => $order->order_no
+        ];
+        // 发送短信通知
+        $shortMessageNotify = new ShortMessageNotify($phoneNumbers, $templateCode, $templateParams);
+        $responseContent = $shortMessageNotify->send();
+        if($responseContent->Code != "OK"){
+            // 短信发送失败时，进行日志记录
+            Log::init([
+               'type' => 'File',
+               'path' => LOG_PATH,
+               'level' => 'error'
+            ]);
+            Log::record('短信发送失败！原因为'. $responseContent->Message, 'error');
+        }
+
         return true;
     }
 }

@@ -13,6 +13,7 @@ use app\api\model\Order as OrderModel;
 use app\api\model\Product as ProductModel;
 use app\api\service\Order as OrderServer;
 use app\api\service\Order;
+use app\api\service\ShortMessageNotify;
 use app\lib\enum\OrderStatusEnum;
 use think\Db;
 use think\Exception;
@@ -37,6 +38,24 @@ class QianyingNotify
                 // 获取订单信息
                 $orderInfo = OrderModel::where('order_no', '=', $orderNO)
                     ->find();
+
+                // 实例短信发送通知类
+                $shortMessageNotify = new ShortMessageNotify($orderInfo->snap_address['mobile'],
+                    'SMS_136862302', ['orderNo' => $orderNO]);
+                // 发送短信通知支付成功
+                $responseContent = $shortMessageNotify->send();
+                // 短信是否发送成功
+                if($responseContent->Code != "OK"){
+                    // 初始化日志类
+                    Log::init([
+                       'type' => 'File',
+                       'path' => LOG_PATH,
+                       'level' => 'error'
+                    ]);
+                    // 进行日志记录
+                    Log::record("发送短信失败！错误原因为：". $responseContent->Message, 'error');
+                }
+
                 // 检验支付是否成功
                 $payStatus = $this->checkPayStatus($data, $orderInfo);
                 if ($payStatus) {

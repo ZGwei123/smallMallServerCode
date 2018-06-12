@@ -136,7 +136,9 @@ class Order extends BaseController
 
     /**
      * 发货(非微信订单),修改订单状态
-     * @param int $id
+     * @http PUT
+     * @url order/process_delivery       id=
+     * @param int $id  订单id
      * @return SuccessMessage
      * @throws OrderException
      * @throws \app\lib\exception\ParameterException
